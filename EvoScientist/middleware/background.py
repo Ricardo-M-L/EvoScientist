@@ -23,7 +23,6 @@ signature to wire the injected runtime — PEP 563 stringized annotations break 
 detection (same reason as ``middleware/expert_async_subagent.py``).
 """
 
-import os
 from pathlib import Path
 from typing import Annotated, Any, NotRequired, TypedDict
 
@@ -34,7 +33,7 @@ from langchain_core.messages import ToolMessage
 from langchain_core.tools import tool
 from langgraph.types import Command
 
-from .. import agent_shell, background
+from .. import agent_shell, background, paths
 from ..backends import is_hitl_suppressed, prepare_sandbox_command
 
 
@@ -203,7 +202,7 @@ def check_process(process_id: str, runtime: ToolRuntime = None) -> "str | Comman
         process_id: The id returned by run_in_background.
     """
     text, record = background.check(process_id, thread_id=_origin_thread_id(runtime))
-    if record is not None or os.environ.get("EVOSCIENTIST_SERVER_PROCESS") == "1":
+    if record is not None or paths.SERVER_PROCESS:
         return _bg_command(text, [record], runtime)
 
     from ..EvoScientist import _ensure_config

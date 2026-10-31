@@ -95,11 +95,13 @@ def test_disabled_server_keeps_unknown_process_response(remote):
 
 def test_dev_server_does_not_query_itself(remote, monkeypatch):
     needs, request = remote
-    monkeypatch.setenv("EVOSCIENTIST_SERVER_PROCESS", "1")
+    # paths consumes the marker at import; tools must use its retained flag.
+    monkeypatch.delenv("EVOSCIENTIST_SERVER_PROCESS", raising=False)
+    monkeypatch.setattr(paths, "SERVER_PROCESS", True)
     result = check_process.func(process_id="server-process", runtime=RUNTIME)
-    assert "No such background process" in result
     needs.assert_not_called()
     request.assert_not_called()
+    assert "No such background process" in result
 
 
 def test_offline_server_keeps_unknown_process_response(remote):
