@@ -355,6 +355,55 @@ async def test_ctrl_c_before_notifier_request_requeues_the_batch(
             runs.finish_all()
 
 
+async def test_ctrl_c_before_notifier_request_survives_input_typed_since(
+    monkeypatch, workspace
+):
+    """A queued input turn can clear the stop flag before the done-callback."""
+    monkeypatch.setattr(async_notifier, "NOTIFICATION_BATCH_GRACE_SECONDS", 0.3)
+    ready = asyncio.Event()
+    entered = asyncio.Event()
+
+    async def load_agent():
+        entered.set()
+        await ready.wait()
+        return object()
+
+    runs = _Runs()
+    app = await _app(monkeypatch, workspace)
+    async with app.run_test(size=(100, 40)) as pilot:
+        try:
+            await pilot.pause()
+            _wire(app, workspace, runs)
+            app._await_agent_ready = AsyncMock(side_effect=load_agent)
+            tid = app._conversation_tid
+            real_drain = app._drain_queue
+            typed = []
+
+            def drain_with_typed_input() -> None:
+                if not typed:
+                    typed.append(True)
+                    app._queued_messages.append("typed")
+                real_drain()
+
+            app._drain_queue = drain_with_typed_input
+            _notification(app, "task-1")
+            app._poll_channel_queue()
+            await _until(lambda: entered.is_set())
+            app.call_later(app.action_request_quit)
+            await _until(lambda: typed)
+            ready.set()
+            await _until(lambda: runs.started == ["typed"])
+            assert has_pending_notifications(tid)
+
+            runs.finish_all()
+            await _poll_until(app, lambda: runs.started == ["typed", NOTICE])
+            runs.finish_all()
+            await _poll_until(app, lambda: _idle(app, runs))
+        finally:
+            ready.set()
+            runs.finish_all()
+
+
 async def test_ctrl_c_after_notifier_request_does_not_replay(monkeypatch, workspace):
     monkeypatch.setattr(async_notifier, "NOTIFICATION_BATCH_GRACE_SECONDS", 0)
     runs = _Runs()

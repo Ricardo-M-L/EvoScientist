@@ -1418,6 +1418,8 @@ def run_textual_interactive(
                     rubric_mode="followup",
                     on_request_sent=mark_sent,
                 )
+                # Read here, not in the done-callback: a turn started from the
+                # queue clears the stop flag before that callback runs.
                 stopped = is_stream_cancel_requested()
                 if _ch_mod.publish_to_channel_origin(effective_tid, response or ""):
                     # Mirror a normal channel turn's closing "Replied to" line
